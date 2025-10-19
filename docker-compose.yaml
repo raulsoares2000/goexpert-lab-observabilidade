@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # Serviço A
+  service-a:
+    build:
+      context: .
+      dockerfile: service-a/Dockerfile
+    container_name: service-a
+    ports:
+      - "8080:8080"
+    depends_on:
+      - service-b
+      - otel-collector
+    environment:
+      # Endereço do coletor OTEL para onde enviaremos os traces
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+
+  # Serviço B
+  service-b:
+    build:
+      context: .
+      dockerfile: service-b/Dockerfile
+    container_name: service-b
+    ports:
+      - "8081:8081"
+    env_file:
+      - service-b/.env
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+    depends_on:
+      - otel-collector
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # Porta para receber os traces (gRPC)
+      - "4318:4318" # Porta para receber os traces (HTTP)
+    depends_on:
+      - zipkin
+
+  # Zipkin
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
